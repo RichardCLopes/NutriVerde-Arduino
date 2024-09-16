@@ -23,8 +23,9 @@ FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
 
-float temperature = 0.0;
-float humidity = 0.0;
+float tempar = 0.0;
+float umidade = 0.0;
+float tds = 0.0;
 
 // Inicializa o WIFI
 void initWiFi() {
@@ -46,7 +47,7 @@ int getSensorReadings() {
   char text[100] = { 0 };
   if (Serial.readBytesUntil('\n', (byte*)text, 100)) {
     Serial.println(text);
-    if (sscanf(text, "%f,%f", &temperature, &humidity) == 2) return 1;
+    if (sscanf(text, "%f,%f,%f", &tempar, &umidade, &tds) == 3) return 1;
   }
   return 0;
 }
@@ -54,7 +55,7 @@ int getSensorReadings() {
 //Conecta no Firebase
 void conectFirebase() {
   // Print Firebase client version
-  Serial.printf("Firebase Client v%s\n\n", FIREBASE_CLIENT_VERSION);
+  Serial.printf("Firebase Client %s\n\n", FIREBASE_CLIENT_VERSION);
 
   // Assign the API key
   config.api_key = API_KEY;
@@ -97,8 +98,9 @@ void setup() {
 void loop() {
     
     if (getSensorReadings() == 0) return;
-    Serial.printf("Temperature = %.2f ºC \n", temperature);
-    Serial.printf("Humidity = %.2f \n", humidity);
+    Serial.printf("Temperatura Ar = %.2f ºC \n", tempar);
+    Serial.printf("Umidade = %.2f \n", umidade);
+    Serial.printf("TDS = %.2f \n", tds);
     Serial.println();
 
   // Obter o timestamp atual
@@ -110,29 +112,47 @@ void loop() {
   // Append "Z" to indicate UTC time
   strcat(timestamp, "Z");
 
-  // Define a unique document ID for each record (e.g., using timestamp)
-  String documentPath = "Sensores/DHT22_" + String(timestamp);
+  // Define document path sensors
+  String pathtar = "tempar/DHT22a_" + String(timestamp);
+  String pathumi = "umidade/DHT22u_" + String(timestamp);
+  String pathtds = "tds/TDS_" + String(timestamp);
 
-  // Create a FirebaseJson object for storing data
-  FirebaseJson content;
+  // Create a FirebaseJson object for storing data sensors
+  FirebaseJson conttar;
+  FirebaseJson contumi;
+  FirebaseJson conttds;
 
   // Check if the values are valid (not NaN)
-  if (!isnan(temperature) && !isnan(humidity)) {
-    // Set the 'Temperature' and 'Humidity' fields in the FirebaseJson object
-    content.set("fields/Temperature/doubleValue", temperature);
-    content.set("fields/Humidity/doubleValue", humidity);
+  if (!isnan(tempar) && !isnan(umidade) && !isnan(tds)) {
+    // Set fields in the FirebaseJson object
+    conttar.set("fields/medicao/doubleValue", tempar);
+    contumi.set("fields/medicao/doubleValue", umidade);
+    conttds.set("fields/medicao/doubleValue", tds);
 
     // Add a timestamp field as a Firestore timestamp
-    content.set("fields/Timestamp/timestampValue", timestamp);
+    conttar.set("fields/datahora/timestampValue", timestamp);
+    contumi.set("fields/datahora/timestampValue", timestamp);
+    conttds.set("fields/datahora/timestampValue", timestamp);
 
-  // Use the createDocument method to add a new document with each reading
-    if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", documentPath.c_str(), content.raw())) {
-      Serial.printf("ok\n%s\n\n", fbdo.payload().c_str());
+  //-------------------------------------------------------LOAD FIREBASE--------------------------------------------
+    if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", pathtar.c_str(), conttar.raw())) {
+      Serial.printf("Ok Conttar\n%s\n\n", fbdo.payload().c_str());
     } else {
       Serial.println(fbdo.errorReason());
     }
+    if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", pathumi.c_str(), contumi.raw())) {
+      Serial.printf("Ok Contumi\n%s\n\n", fbdo.payload().c_str());
+    } else {
+      Serial.println(fbdo.errorReason());
+    }
+    if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", pathtds.c_str(), conttds.raw())) {
+      Serial.printf("Ok Conttds\n%s\n\n", fbdo.payload().c_str());
+    } else {
+      Serial.println(fbdo.errorReason());
+    }
+    
   } else {
-    Serial.println("Failed to read DHT data.");
+    Serial.println("Failed to read data.");
   }
 
   // Delay before the next reading
