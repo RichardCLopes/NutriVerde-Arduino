@@ -12,6 +12,7 @@
 #define WIFI_SSID "Desktop_F9010136"
 #define WIFI_PASSWORD "gtx2080TI"
 
+
 // Define Firebase API Key, Project ID, and user credentials
 #define API_KEY "AIzaSyBewwdWp3eRIRNYfgdoiOcjqJAcuvIrO_g"
 #define FIREBASE_PROJECT_ID "nutriverdeiot2"
@@ -26,6 +27,7 @@ FirebaseConfig config;
 float tempar = 0.0;
 float umidade = 0.0;
 float tds = 0.0;
+float uvt = 0.0;
 
 // Inicializa o WIFI
 void initWiFi() {
@@ -47,7 +49,7 @@ int getSensorReadings() {
   char text[100] = { 0 };
   if (Serial.readBytesUntil('\n', (byte*)text, 100)) {
     Serial.println(text);
-    if (sscanf(text, "%f,%f,%f", &tempar, &umidade, &tds) == 3) return 1;
+    if (sscanf(text, "%f,%f,%f,%f", &tempar, &umidade, &tds, &uvt) == 4) return 1;
   }
   return 0;
 }
@@ -98,9 +100,11 @@ void setup() {
 void loop() {
     
     if (getSensorReadings() == 0) return;
-    Serial.printf("Temperatura Ar = %.2f ºC \n", tempar);
+    
+    Serial.printf("\nTemperatura Ar = %.2f ºC \n", tempar);
     Serial.printf("Umidade = %.2f \n", umidade);
     Serial.printf("TDS = %.2f \n", tds);
+    Serial.printf("UV = %.2f \n", uvt);
     Serial.println();
 
   // Obter o timestamp atual
@@ -116,11 +120,13 @@ void loop() {
   String pathtar = "tempar/DHT22a_" + String(timestamp);
   String pathumi = "umidade/DHT22u_" + String(timestamp);
   String pathtds = "tds/TDS_" + String(timestamp);
+  String pathuvt = "radiacao/UV_" + String(timestamp);
 
   // Create a FirebaseJson object for storing data sensors
   FirebaseJson conttar;
   FirebaseJson contumi;
   FirebaseJson conttds;
+  FirebaseJson contuvt;
 
   // Check if the values are valid (not NaN)
   if (!isnan(tempar) && !isnan(umidade) && !isnan(tds)) {
@@ -128,11 +134,13 @@ void loop() {
     conttar.set("fields/medicao/doubleValue", tempar);
     contumi.set("fields/medicao/doubleValue", umidade);
     conttds.set("fields/medicao/doubleValue", tds);
+    contuvt.set("fields/medicao/doubleValue", uvt);
 
     // Add a timestamp field as a Firestore timestamp
     conttar.set("fields/datahora/timestampValue", timestamp);
     contumi.set("fields/datahora/timestampValue", timestamp);
     conttds.set("fields/datahora/timestampValue", timestamp);
+    contuvt.set("fields/datahora/timestampValue", timestamp);
 
   //-------------------------------------------------------LOAD FIREBASE--------------------------------------------
     if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", pathtar.c_str(), conttar.raw())) {
@@ -146,6 +154,11 @@ void loop() {
       Serial.println(fbdo.errorReason());
     }
     if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", pathtds.c_str(), conttds.raw())) {
+      Serial.printf("Ok Conttds\n%s\n\n", fbdo.payload().c_str());
+    } else {
+      Serial.println(fbdo.errorReason());
+    }
+    if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", pathuvt.c_str(), contuvt.raw())) {
       Serial.printf("Ok Conttds\n%s\n\n", fbdo.payload().c_str());
     } else {
       Serial.println(fbdo.errorReason());

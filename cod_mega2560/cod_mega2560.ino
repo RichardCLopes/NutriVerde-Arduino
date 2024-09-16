@@ -17,6 +17,12 @@ float templiq = 25.0;
 float tds = 0.0;
 //------------------------------------------------------------------------
 
+//-------------------------SENSOR ULTRAVIOLETA----------------------------
+#define pinSensorUV    A0
+int leituraUV=0; // Variavel para armazenar a leitura da porta analógica
+byte indiceUV=0; // Variavel para armazenar a conversão para indice UV
+//------------------------------------------------------------------------
+
 
 void setup() {
   Serial.begin(115200); //Inicializa serial
@@ -28,6 +34,7 @@ void setup() {
   gravityTds.setAref(5.0);  //reference voltage on ADC, default 5.0V on Arduino UNO
   gravityTds.setAdcRange(4096);  //1024 for 10bit ADC;4096 for 12bit ADC
   gravityTds.begin();  //initialization
+  pinMode(pinSensorUV, INPUT); //Sensor UV
 
   
   delay(15000);
@@ -44,6 +51,10 @@ void loop() {
   gravityTds.update();  //Amostra e Calculo
   float tds = gravityTds.getTdsValue();  // Pega o valor
 
+  //LEITURA DE DADOS DO SENSOR ULTRAVIOLETA
+  leituraUV = analogRead(pinSensorUV); // Realçiza a leitura na porta analógica
+  indiceUV = map(leituraUV, 0,203,0,11) ; // Converte a faixa de sinal do sensor de 0v a 1v para o índice uv de 0 a 10.
+  
    //verifica se foram lidos corretamente,
    if (isnan(umidade) || isnan(tempar) || isnan(tds)) {
     Serial.println("Falha na leitura dos sensores!");
@@ -55,6 +66,8 @@ void loop() {
     Serial.println(umidade);
     Serial.print("TDS:"); // Indicador de umidade
     Serial.println(tds);
+    Serial.print("UV:"); // Indicador de umidade
+    Serial.println(indiceUV);
   }
 
 
@@ -69,6 +82,8 @@ void loop() {
   Serial3.print(umidade);
   Serial3.print(',');
   Serial3.print(tds);
+  Serial3.print(',');
+  Serial3.print(indiceUV);
   Serial3.print('\n');
 
   //Espera 15 segundos para fazer o loop
