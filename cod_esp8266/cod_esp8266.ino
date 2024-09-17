@@ -100,12 +100,7 @@ void setup() {
 void loop() {
     
     if (getSensorReadings() == 0) return;
-    
-    Serial.printf("\nTemperatura Ar = %.2f ºC \n", tempar);
-    Serial.printf("Umidade = %.2f \n", umidade);
-    Serial.printf("TDS = %.2f \n", tds);
-    Serial.printf("UV = %.2f \n", uvt);
-    Serial.println();
+
 
   // Obter o timestamp atual
   time_t now = time(nullptr);

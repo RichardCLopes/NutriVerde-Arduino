@@ -23,6 +23,18 @@ int leituraUV=0; // Variavel para armazenar a leitura da porta analógica
 byte indiceUV=0; // Variavel para armazenar a conversão para indice UV
 //------------------------------------------------------------------------
 
+//------------------------------SENSOR PH---------------------------------
+//Para calibrar o sensor de pH é necessario seguir os seguintes passos
+//1º - Medir voltagem do sensor no vinagre (pH 3) e no alvejante(pH 13)
+//2º - Tirar a equação da reta em https://pt.symbolab.com/solver/line-equation-calculator
+//3º - Altera os valores de valor_calibracao e multi de acordo com a equação
+//Caso não tenha os materiais, é possivel calibrar utilizando outros elementos, cujo saiba o pH
+//Se for possível calibrar o potenciometro do analogico utilizado em 2.5V a fórmula é -5.7 * X -21.24
+int ph_pin = A4; 
+float valor_calibracao = 26.8;
+float multi = -5.7;
+//------------------------------------------------------------------------
+
 
 void setup() {
   Serial.begin(115200); //Inicializa serial
@@ -54,6 +66,23 @@ void loop() {
   //LEITURA DE DADOS DO SENSOR ULTRAVIOLETA
   leituraUV = analogRead(pinSensorUV); // Realçiza a leitura na porta analógica
   indiceUV = map(leituraUV, 0,203,0,11) ; // Converte a faixa de sinal do sensor de 0v a 1v para o índice uv de 0 a 10.
+
+  //LEITURA DO PH
+  int measure = analogRead(ph_pin);
+  Serial.print("Measure: ");
+  Serial.print(measure);
+
+  double voltage = (5 / 1024.0) * measure; 
+  Serial.print("\tVoltage: ");
+  Serial.print(voltage, 3);
+
+  
+  float Po = 7 + ((2.5 - voltage) / 0.18);
+  Serial.print("\tPH: ");
+  Serial.print(Po, 3);
+
+  Serial.println("");
+  
   
    //verifica se foram lidos corretamente,
    if (isnan(umidade) || isnan(tempar) || isnan(tds)) {
@@ -87,5 +116,5 @@ void loop() {
   Serial3.print('\n');
 
   //Espera 15 segundos para fazer o loop
-  delay(15000);
+  delay(5000);
 }
