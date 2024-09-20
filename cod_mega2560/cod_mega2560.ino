@@ -31,8 +31,6 @@ byte indiceUV=0; // Variavel para armazenar a conversão para indice UV
 //Caso não tenha os materiais, é possivel calibrar utilizando outros elementos, cujo saiba o pH
 //Se for possível calibrar o potenciometro do analogico utilizado em 2.5V a fórmula é -5.7 * X -21.24
 int ph_pin = A4; 
-float valor_calibracao = 26.8;
-float multi = -5.7;
 //------------------------------------------------------------------------
 
 
@@ -76,16 +74,14 @@ void loop() {
   Serial.print("\tVoltage: ");
   Serial.print(voltage, 3);
 
-  
-  float Po = 7 + ((2.5 - voltage) / 0.18);
+  float sph = 7 + ((2.5 - voltage) / 0.18);
   Serial.print("\tPH: ");
-  Serial.print(Po, 3);
-
+  Serial.print(sph, 3);
   Serial.println("");
   
   
    //verifica se foram lidos corretamente,
-   if (isnan(umidade) || isnan(tempar) || isnan(tds)) {
+   if (isnan(umidade) || isnan(tempar) || isnan(tds) || isnan(indiceUV) || isnan(sph)) {
     Serial.println("Falha na leitura dos sensores!");
   } else {
     // Envia os dados para o ESP8266 via Serial
@@ -97,6 +93,8 @@ void loop() {
     Serial.println(tds);
     Serial.print("UV:"); // Indicador de umidade
     Serial.println(indiceUV);
+    Serial.print("pH:"); // Indicador de umidade
+    Serial.println(sph);
   }
 
 
@@ -113,6 +111,8 @@ void loop() {
   Serial3.print(tds);
   Serial3.print(',');
   Serial3.print(indiceUV);
+  Serial3.print(',');
+  Serial3.print(sph);
   Serial3.print('\n');
 
   //Espera 15 segundos para fazer o loop
