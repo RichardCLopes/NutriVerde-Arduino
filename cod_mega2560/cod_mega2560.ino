@@ -5,17 +5,21 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-
 //---------------SENSOR DE UMIDADE E TEMPERATURA DO AR--------------------
 #define DHTPIN 10      // Pino digital onde o DHT22 está conectado
 #define DHTTYPE DHT22 // Define o tipo de sensor DHT
 DHT dht(DHTPIN, DHTTYPE);
 //------------------------------------------------------------------------
 
+//---------------------------SENSOR TERMOMETRO----------------------------
+#define ONE_WIRE_BUS 7 // Define pino do sensor
+OneWire oneWire(ONE_WIRE_BUS); // Cria um objeto OneWire
+DallasTemperature sensors(&oneWire); // Informa a referencia da biblioteca dallas temperature para Biblioteca onewire
+//------------------------------------------------------------------------
+
 //-------------SENSOR DE TOTAL DE SOLIDOS DISSOLVIDOS (TDS)---------------
 #define TdsSensorPin A2
 GravityTDS gravityTds;
-float templiq = 25.0;
 float tds = 0.0;
 //------------------------------------------------------------------------
 
@@ -35,12 +39,6 @@ byte indiceUV=0; // Variavel para armazenar a conversão para indice UV
 int ph_pin = A4; 
 //------------------------------------------------------------------------
 
-//---------------------------SENSOR TERMOMETRO----------------------------
-#define ONE_WIRE_BUS 7 // Define pino do sensor
-OneWire oneWire(ONE_WIRE_BUS); // Cria um objeto OneWire
-DallasTemperature sensors(&oneWire); // Informa a referencia da biblioteca dallas temperature para Biblioteca onewire
-//------------------------------------------------------------------------
-
 //---------------------------SENSOR DE VAZÃO----------------------------
 //definicao do pino do sensor e de interrupcao
 const int INTERRUPCAO_SENSOR = 0; //interrupt = 0 equivale ao pino digital 2
@@ -49,14 +47,13 @@ const int PINO_SENSORVZ = 2;
 //definicao de variaveis
 unsigned long contador = 0;
 const float FATOR_CALIBRACAO = 4.5; //
-float fluxo = 0;
+float fluxo = 0.0;
 unsigned long tempo_antes = 0;
 
 void contador_pulso() {
   contador++;
 }
 //------------------------------------------------------------------------
-
 
 void setup() {
   Serial.begin(115200); //Inicializa serial
@@ -69,8 +66,8 @@ void setup() {
   gravityTds.setAdcRange(4096);  //1024 for 10bit ADC;4096 for 12bit ADC
   gravityTds.begin();  //initialization
   pinMode(pinSensorUV, INPUT); //Sensor UV
-  pinMode(PINO_SENSORVZ, INPUT_PULLUP); //Sensor vazão
   sensors.begin(); //Inicia o termometro
+  pinMode(PINO_SENSORVZ, INPUT_PULLUP); //Sensor vazão
   
   delay(15000);
 }
@@ -81,21 +78,21 @@ void loop() {
   float umidade = dht.readHumidity();     // Lê a umidade
   float tempar = dht.readTemperature(); // Lê a temperatura
 
+   //LEITURA TEMPERATURA DO LIQUIDO
+  sensors.requestTemperatures(); // Envia comando para realizar a conversão de temperatura
+  float templiq = sensors.getTempCByIndex(0);
+
   //LEITURA DE DADOS DO TDS
   gravityTds.setTemperature(templiq);  // Define a temperatura e executa a compensação
   gravityTds.update();  //Amostra e Calculo
   float tds = gravityTds.getTdsValue();  // Pega o valor
-
-  //LEITURA DE DADOS DO SENSOR ULTRAVIOLETA
-  leituraUV = analogRead(pinSensorUV); // Realçiza a leitura na porta analógica
-  indiceUV = map(leituraUV, 0,203,0,11) ; // Converte a faixa de sinal do sensor de 0v a 1v para o índice uv de 0 a 10.
 
   //LEITURA DO PH
   int measure = analogRead(ph_pin);
   //Serial.print("Measure: ");
   //Serial.print(measure);
   measure = measure - measure*0.15;
-  double voltage = (5 / 1024.0) * measure; 
+  float voltage = (5 / 1024.0) * measure; 
   //Serial.print("\tVoltage: ");
   //Serial.print(voltage, 3);
   float PH_fim = 3.40;
@@ -107,12 +104,6 @@ void loop() {
   //Serial.print("\tPH: ");
   //Serial.print(sph, 3);
   //Serial.println("");
-  
-
-
-  //LEITURA TEMPERATURA DO LIQUIDO
-  sensors.requestTemperatures(); // Envia comando para realizar a conversão de temperatura
-  float templiq = sensors.getTempCByIndex(0);
 
   //LEITURA DE VAZÃO
   if((millis() - tempo_antes) > 1000){  
@@ -124,27 +115,28 @@ void loop() {
   attachInterrupt(INTERRUPCAO_SENSOR, contador_pulso, FALLING); //contagem de pulsos do sensor    
   }
   
-  
    //verifica se foram lidos corretamente,
-   if (isnan(tempar) || isnan(umidade) || isnan(tds) || isnan(indiceUV) || isnan(sph) || isnan(templiq) || isnan(fluxo)) {
+   if (isnan(tempar) || isnan(umidade) || isnan(templiq) || isnan(tds) || isnan(indiceUV) || isnan(sph)) {
     Serial.println("Falha na leitura dos sensores!");
   } else {
     // Envia os dados para o ESP8266 via Serial
-    Serial.print(" Temp. Ar: "); // Indicador de temperatura
+    /*
+    Serial.print(" Temp. Ar: "); 
     Serial.print(tempar);
-    Serial.print(" ºC\t\tUmidade: "); // Indicador de umidade
+    Serial.print(" ºC\t\tUmidade: "); 
     Serial.print(umidade);
-    Serial.print(" %\t\tTDS :"); // Indicador de umidade
+    Serial.print(" %\t\tTemp. Liq: ");
+    Serial.print(templiq); 
+    Serial.print(" ºC\t\tTDS: "); 
     Serial.print(tds);
-    Serial.print(" Mg\\L\t\tUV: "); // Indicador de umidade
+    Serial.print(" Mg\\L\t\tUV: "); 
     Serial.print(indiceUV);
-    Serial.print(" W\\M2\t\tpH: "); // Indicador de umidade
+    Serial.print(" W\\M2\t\tpH: "); 
     Serial.print(sph);
-    Serial.print(" ºC\t\tTemp. Liq: "); // Indicador de umidade
-    Serial.print(templiq);
-    Serial.print(" ºC\t\tVazao: "); // Indicador de umidade
+    Serial.print(" \t\tVazao: "); 
     Serial.print(fluxo);
-    Serial.print(" L\\min\n");
+    Serial.print(" L\\min\n"); 
+    */
   }
 
 
@@ -154,21 +146,10 @@ void loop() {
   }
 
   //Envia os dados
-  Serial3.print(tempar);
-  Serial3.print(',');
-  Serial3.print(umidade);
-  Serial3.print(',');
-  Serial3.print(tds);
-  Serial3.print(',');
-  Serial3.print(indiceUV);
-  Serial3.print(',');
-  Serial3.print(sph);
-  Serial3.print(',');
-  Serial3.print(templiq);
-  Serial3.print(',');
-  Serial3.print(fluxo);
-  Serial3.print('\n');
+  String dados = String(tempar, 1) + "," + String(umidade, 1) + "," + String(templiq, 1) + "," + String(tds, 1) + "," + String(indiceUV) + "," + String(sph, 1) +  "," + String(fluxo, 2) + "\n";
+  Serial3.print(dados);
 
-  //Espera 15 segundos para fazer o loop
-  delay(5000);
+
+  //Espera 20 segundos para fazer o loop
+  delay(20000);
 }

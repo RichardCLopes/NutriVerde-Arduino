@@ -24,11 +24,17 @@ FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
 
-float tempar = 0.0;
-float umidade = 0.0;
-float tds = 0.0;
-float uvt = 0.0;
-float sph = 0.0;
+struct SensorData {
+  float tempar;
+  float umidade;
+  float templiq;
+  float tds;
+  float uvt;
+  float sph;
+  float vazao;
+};
+
+SensorData sensores = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
 // Inicializa o WIFI
 void initWiFi() {
@@ -47,10 +53,10 @@ void initWiFi() {
 // Recebe as leituras de sensores via Serial do Mega2560
 int getSensorReadings() {
   if (Serial.available() == 0) return 0;
-  char text[100] = { 0 };
-  if (Serial.readBytesUntil('\n', (byte*)text, 100)) {
+  char text[200] = { 0 };
+  if (Serial.readBytesUntil('\n', (byte*)text, 200)) {
     Serial.println(text);
-    if (sscanf(text, "%f,%f,%f,%f,%f", &tempar, &umidade, &tds, &uvt, &sph) == 5) return 1;
+    if (sscanf(text, "%f,%f,%f,%f,%f,%f,%f", &sensores.tempar, &sensores.umidade, &sensores.templiq, &sensores.tds, &sensores.uvt, &sensores.sph, &sensores.vazao) == 7) return 1;
   }
   return 0;
 }
@@ -88,6 +94,21 @@ void configTime() {
   Serial.println();
 }
 
+
+// Envia dados para Firebase
+void enviarParaFirebase(String path, FirebaseJson &jsondoc) {
+  if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", path.c_str(), jsondoc.raw())) {
+    Serial.printf("Data sent successfully\n");
+  } else {
+    Serial.printf("Error sending data to %s: %s\n", path.c_str(), fbdo.errorReason().c_str());
+  }
+}
+
+// Valida dados
+bool isValidReadings() {
+  return !(isnan(sensores.tempar) || isnan(sensores.umidade) || isnan(sensores.templiq) || isnan(sensores.tds) || isnan(sensores.uvt) || isnan(sensores.sph) || isnan(sensores.vazao));
+}
+
 //-----------------SETUP---------------------
 void setup() {
   Serial.begin(115200);
@@ -100,8 +121,7 @@ void setup() {
 //----------------LOOP----------------------
 void loop() {
     
-    if (getSensorReadings() == 0) return;
-
+  if (getSensorReadings() == 0) return;
 
   // Obter o timestamp atual
   time_t now = time(nullptr);
@@ -112,67 +132,58 @@ void loop() {
   // Append "Z" to indicate UTC time
   strcat(timestamp, "Z");
 
-  // Define document path sensors
-  String pathtar = "tempar/DHT22a_" + String(timestamp);
-  String pathumi = "umidade/DHT22u_" + String(timestamp);
-  String pathtds = "tds/TDS_" + String(timestamp);
-  String pathuvt = "radiacao/UV_" + String(timestamp);
-  String pathsph = "ph/PH_" + String(timestamp);
 
-  // Create a FirebaseJson object for storing data sensors
-  FirebaseJson conttar;
-  FirebaseJson contumi;
-  FirebaseJson conttds;
-  FirebaseJson contuvt;
-  FirebaseJson contsph;
-
-  // Check if the values are valid (not NaN)
-  if (!isnan(tempar) && !isnan(umidade) && !isnan(tds) && !isnan(uvt) && !isnan(sph)) {
-    // Set fields in the FirebaseJson object
-    conttar.set("fields/medicao/doubleValue", tempar);
-    contumi.set("fields/medicao/doubleValue", umidade);
-    conttds.set("fields/medicao/doubleValue", tds);
-    contuvt.set("fields/medicao/doubleValue", uvt);
-    contsph.set("fields/medicao/doubleValue", sph);
-
-    // Add a timestamp field as a Firestore timestamp
-    conttar.set("fields/datahora/timestampValue", timestamp);
-    contumi.set("fields/datahora/timestampValue", timestamp);
-    conttds.set("fields/datahora/timestampValue", timestamp);
-    contuvt.set("fields/datahora/timestampValue", timestamp);
-    contsph.set("fields/datahora/timestampValue", timestamp);
-
-  //-------------------------------------------------------LOAD FIREBASE--------------------------------------------
-    if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", pathtar.c_str(), conttar.raw())) {
-      Serial.printf("Ok Conttar\n%s\n\n", fbdo.payload().c_str());
-    } else {
-      Serial.println(fbdo.errorReason());
-    }
-    if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", pathumi.c_str(), contumi.raw())) {
-      Serial.printf("Ok Contumi\n%s\n\n", fbdo.payload().c_str());
-    } else {
-      Serial.println(fbdo.errorReason());
-    }
-    if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", pathtds.c_str(), conttds.raw())) {
-      Serial.printf("Ok Conttds\n%s\n\n", fbdo.payload().c_str());
-    } else {
-      Serial.println(fbdo.errorReason());
-    }
-    if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", pathuvt.c_str(), contuvt.raw())) {
-      Serial.printf("Ok Contuvt\n%s\n\n", fbdo.payload().c_str());
-    } else {
-      Serial.println(fbdo.errorReason());
-    }
-    if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", pathsph.c_str(), contsph.raw())) {
-      Serial.printf("Ok Contsph\n%s\n\n", fbdo.payload().c_str());
-    } else {
-      Serial.println(fbdo.errorReason());
-    }
+ //-------------------------------------------------------LOAD FIREBASE--------------------------------------------
+  FirebaseJson jsonDoc;
+  
+  if (isValidReadings()) {
+    // Reutiliza o mesmo FirebaseJson para cada sensor
+    jsonDoc.set("fields/medicao/doubleValue", sensores.tempar);
+    jsonDoc.set("fields/datahora/timestampValue", timestamp);
+    enviarParaFirebase("tempar/DHT22a_" + String(timestamp), jsonDoc);
+  
+    jsonDoc.clear();  // Limpa o conteúdo para reutilização
+  
+    jsonDoc.set("fields/medicao/doubleValue", sensores.umidade);
+    jsonDoc.set("fields/datahora/timestampValue", timestamp);
+    enviarParaFirebase("umidade/DHT22u_" + String(timestamp), jsonDoc);
+  
+    jsonDoc.clear();
+  
+    jsonDoc.set("fields/medicao/doubleValue", sensores.templiq);
+    jsonDoc.set("fields/datahora/timestampValue", timestamp);
+    enviarParaFirebase("templiq/DS18B20_" + String(timestamp), jsonDoc);
+  
+    jsonDoc.clear();
+  
+    jsonDoc.set("fields/medicao/doubleValue", sensores.tds);
+    jsonDoc.set("fields/datahora/timestampValue", timestamp);
+    enviarParaFirebase("tds/TDS_" + String(timestamp), jsonDoc);
+  
+    jsonDoc.clear();
+  
+    jsonDoc.set("fields/medicao/doubleValue", sensores.uvt);
+    jsonDoc.set("fields/datahora/timestampValue", timestamp);
+    enviarParaFirebase("radiacao/UV_" + String(timestamp), jsonDoc);
+  
+    jsonDoc.clear();
+  
+    jsonDoc.set("fields/medicao/doubleValue", sensores.sph);
+    jsonDoc.set("fields/datahora/timestampValue", timestamp);
+    enviarParaFirebase("ph/PH_" + String(timestamp), jsonDoc);
+  
+    jsonDoc.clear();
+  
+    jsonDoc.set("fields/medicao/doubleValue", sensores.vazao);
+    jsonDoc.set("fields/datahora/timestampValue", timestamp);
+    enviarParaFirebase("vazao/YFS201_" + String(timestamp), jsonDoc);
     
-  } else {
-    Serial.println("Failed to read data.");
-  }
+    jsonDoc.clear();
+  }else {
+      Serial.println("Failed to read data.");
+    }
+
 
   // Delay before the next reading
-  delay(10000);
+  delay(15000);
 }
