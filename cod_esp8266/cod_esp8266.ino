@@ -8,6 +8,9 @@
 #include <Firebase_ESP_Client.h>
 #include <addons/TokenHelper.h>
 
+//define min timestamp
+#define MIN_TIMESTAMP 1609459200 
+
 // Define WiFi credentials
 #define WIFI_SSID "Desktop_F9010136"
 #define WIFI_PASSWORD "gtx2080TI"
@@ -89,7 +92,7 @@ void configTime() {
   Serial.print("Waiting for time");
   while (!time(nullptr)) {
     Serial.print(".");
-    delay(500);
+    delay(1000);
   }
   Serial.println();
 }
@@ -97,12 +100,26 @@ void configTime() {
 
 // Envia dados para Firebase
 void enviarParaFirebase(String path, FirebaseJson &jsondoc) {
-  if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", path.c_str(), jsondoc.raw())) {
-    Serial.printf("Data sent successfully\n");
-  } else {
-    Serial.printf("Error sending data to %s: %s\n", path.c_str(), fbdo.errorReason().c_str());
+  int maxRetries = 3;  // Definir o número máximo de tentativas
+  int attempts = 0;
+  bool success = false;
+
+  while (attempts < maxRetries && !success) {
+    if (Firebase.Firestore.createDocument(&fbdo, FIREBASE_PROJECT_ID, "", path.c_str(), jsondoc.raw())) {
+      Serial.printf("Data sent successfully to %s\n", path.c_str());
+      success = true;  // O envio foi bem-sucedido, sair do loop
+    } else {
+      Serial.printf("Error sending data to %s: %s\n", path.c_str(), fbdo.errorReason().c_str());
+      attempts++;
+      delay(1000);  // Espera 1 segundo antes de tentar novamente
+    }
+  }
+
+  if (!success) {
+    Serial.println("Failed to send data after multiple attempts.");
   }
 }
+
 
 // Valida dados
 bool isValidReadings() {
@@ -115,6 +132,7 @@ void setup() {
   initWiFi();
   conectFirebase();
   configTime();
+  delay(2000);
 }
 
 
@@ -131,13 +149,12 @@ void loop() {
 
   // Append "Z" to indicate UTC time
   strcat(timestamp, "Z");
-
-
+  delay(1000);
  //-------------------------------------------------------LOAD FIREBASE--------------------------------------------
   FirebaseJson jsonDoc;
   
-  if (isValidReadings()) {
-    // Reutiliza o mesmo FirebaseJson para cada sensor
+  if (isValidReadings() && now > MIN_TIMESTAMP) {
+    
     jsonDoc.set("fields/medicao/doubleValue", sensores.tempar);
     jsonDoc.set("fields/datahora/timestampValue", timestamp);
     enviarParaFirebase("tempar/DHT22a_" + String(timestamp), jsonDoc);
@@ -179,11 +196,24 @@ void loop() {
     enviarParaFirebase("vazao/YFS201_" + String(timestamp), jsonDoc);
     
     jsonDoc.clear();
+
+    jsonDoc.set("fields/tempar/doubleValue", sensores.tempar);
+    jsonDoc.set("fields/umidade/doubleValue", sensores.umidade);
+    jsonDoc.set("fields/templiq/doubleValue", sensores.templiq);
+    jsonDoc.set("fields/tds/doubleValue", sensores.tds);
+    jsonDoc.set("fields/radiacao/doubleValue", sensores.uvt);
+    jsonDoc.set("fields/ph/doubleValue", sensores.sph);
+    jsonDoc.set("fields/vazao/doubleValue", sensores.vazao);
+    jsonDoc.set("fields/datahora/timestampValue", timestamp);
+    
+    enviarParaFirebase("allsensors/AllSensors_" + String(timestamp), jsonDoc);
+    
+    jsonDoc.clear();
   }else {
       Serial.println("Failed to read data.");
     }
 
 
   // Delay before the next reading
-  delay(15000);
+  delay(14000);
 }
