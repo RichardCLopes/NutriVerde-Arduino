@@ -12,8 +12,10 @@
 #define MIN_TIMESTAMP 1609459200 
 
 // Define WiFi credentials
-#define WIFI_SSID "Desktop_F9010136"
-#define WIFI_PASSWORD "gtx2080TI"
+#define WIFI_SSID "arduinom"
+#define WIFI_PASSWORD "asd12345"
+//#define WIFI_SSID "Desktop_F9010136"
+//#define WIFI_PASSWORD "gtx2080TI"
 
 
 // Define Firebase API Key, Project ID, and user credentials
