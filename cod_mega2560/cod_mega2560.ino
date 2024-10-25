@@ -81,6 +81,10 @@ void loop() {
    //LEITURA TEMPERATURA DO LIQUIDO
   sensors.requestTemperatures(); // Envia comando para realizar a conversão de temperatura
   float templiq = sensors.getTempCByIndex(0);
+  
+  //LEITURA RADIACAO
+  leituraUV = analogRead(pinSensorUV); // REALIZA A LEITURA DA PORTA ANALÓGICA 
+  indiceUV = map(leituraUV, 0,203,0,11) ; // CONVERTE A FAIXA DE SINAL DO SENSOR DE 0V A 1V PARA O INDICE UV DE 0 A 11.
 
   //LEITURA DE DADOS DO TDS
   gravityTds.setTemperature(templiq);  // Define a temperatura e executa a compensação
